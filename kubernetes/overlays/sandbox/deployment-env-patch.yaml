@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bricklink-web-gateway
+spec:
+  template:
+    spec:
+      containers:
+        - name: bricklink-web-gateway
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: sandbox,kubernetes

@@ -28,3 +28,8 @@ target/
 
 ### VS Code ###
 .vscode/
+
+### Browser profile and exported sessions: live credentials, never commit ###
+.bricklink-web-gateway/
+portable-state.json
+*storage-state*.json

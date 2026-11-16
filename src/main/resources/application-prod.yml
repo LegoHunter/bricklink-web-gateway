@@ -1,0 +1,11 @@
+spring:
+  config:
+    import:
+      # Holds bricklink.web-gateway.admin-token and caller-token for this environment. Optional so
+      # the gateway starts before the secret exists; without it every token-protected endpoint is shut.
+      - optional:file:${import-path}/bricklink-web-gateway.yml
+
+lego:
+  environment:
+    code: prod
+    production: true

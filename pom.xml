@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.10</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>io.legohunter</groupId>
+    <artifactId>bricklink-web-gateway</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>BrickLink :: Web Gateway</name>
+    <description>Holds one signed-in BrickLink website session and exposes it as task-level REST endpoints.</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Must match the Playwright base image tag in kubernetes/Containerfile: the image carries
+             the Chromium build this driver version expects. -->
+        <playwright.version>1.56.0</playwright.version>
+        <!-- Which platforms' Playwright driver (a Node runtime, about 40 MB each) go into the jar.
+             Playwright's own bundle ships five; the cluster runs linux-arm64 only. Outside CI the
+             local-driver profile below adds Windows, for running the gateway on a developer PC. -->
+        <playwright.driver.platforms>driver/linux-arm64/**</playwright.driver.platforms>
+        <github.organization>LegoHunter</github.organization>
+        <github.repo.url>https://github.com/${github.organization}/bricklink-web-gateway.git</github.repo.url>
+    </properties>
+
+    <scm>
+        <url>${github.repo.url}</url>
+        <connection>scm:git:${github.repo.url}</connection>
+        <developerConnection>scm:git:${github.repo.url}</developerConnection>
+    </scm>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>${playwright.version}</version>
+            <exclusions>
+                <!-- The drivers for every platform (196 MB). The platforms actually needed are
+                     copied out of it into the jar by maven-dependency-plugin below. -->
+                <exclusion>
+                    <groupId>com.microsoft.playwright</groupId>
+                    <artifactId>driver-bundle</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>8.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- The consistency tests read the Kubernetes manifests. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Copies Playwright's driver loader and the drivers for the wanted platforms out of
+                 driver-bundle into the application's classes. Playwright finds them on the
+                 classpath exactly as it finds the stock bundle. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>unpack-playwright-driver</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.microsoft.playwright</groupId>
+                                    <artifactId>driver-bundle</artifactId>
+                                    <version>${playwright.version}</version>
+                                    <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                                    <includes>com/microsoft/playwright/impl/driver/jar/**,${playwright.driver.platforms}</includes>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Writes git.properties, which /actuator/info reports (same as lego-data-service). -->
+            <plugin>
+                <groupId>pl.project13.maven</groupId>
+                <artifactId>git-commit-id-plugin</artifactId>
+                <version>4.9.10</version>
+                <executions>
+                    <execution>
+                        <id>get-the-git-infos</id>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>validate-the-git-infos</id>
+                        <goals>
+                            <goal>validateRevision</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <failOnNoGitDirectory>false</failOnNoGitDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Anywhere but CI (GitHub Actions sets CI=true): also include the Windows driver, so the
+             gateway can start a browser on a developer PC. For another platform, override the
+             property, e.g. -Dplaywright.driver.platforms=driver/linux-arm64/**,driver/mac-arm64/** -->
+        <profile>
+            <id>local-driver</id>
+            <activation>
+                <property>
+                    <name>!env.CI</name>
+                </property>
+            </activation>
+            <properties>
+                <playwright.driver.platforms>driver/linux-arm64/**,driver/win32_x64/**</playwright.driver.platforms>
+            </properties>
+        </profile>
+    </profiles>
+
+</project>

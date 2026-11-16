@@ -1,0 +1,76 @@
+# Who may reach the gateway, and what the gateway may reach.
+#
+# Applied ONCE per namespace by an administrator (the deploy runner has no rights on
+# NetworkPolicies):
+#
+#   kubectl --context lcms-admin -n services-<env> apply -f kubernetes/cluster-setup/network-policy.yaml
+#
+# This limits the network path. Who may act is decided separately, by the bearer tokens.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bricklink-web-gateway
+  labels:
+    app.kubernetes.io/name: bricklink-web-gateway
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: lego-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: bricklink-web-gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The one calling service, lego-data-ingress in the same namespace, straight to the Service.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: lego-data-ingress
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Traefik: the HTTPS route on the internal hostname (the owner's PC, the deploy smoke check).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Metrics scraping.
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: ["monitoring", "alloy"]
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # DNS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # BrickLink and the LEGO Account site, over HTTPS. A NetworkPolicy cannot name hosts, so this
+    # is "any public address": everything inside the home network and the cluster is excluded.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

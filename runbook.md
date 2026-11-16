@@ -1,8 +1,7 @@
 # bricklink-web-gateway runbook
 
-Operational procedures for the BrickLink web gateway. This document is usable before the service
-is built: the parts that run on your PC use the proven spike tooling today, and the parts that run
-against the gateway are marked **(planned — phase 1, HOMELAB-90)** until the service exists.
+Operational procedures for the BrickLink web gateway: the session core (state, probe, keep-alive,
+session import). Lot operations come in a later phase.
 
 Design and background: `00-workspace/context/bricklink-web-gateway/bricklink-web-gateway-design.md`
 in the `lego-collection-workspace` repository.
@@ -41,7 +40,7 @@ needed. A real sign-in is required only in two situations:
 
 Do a fresh manual login (section 5) when any of these are true:
 
-- The gateway's `GET /session` reports `SIGNED_OUT` **(planned — phase 1)**.
+- The gateway's `GET /session` reports `SIGNED_OUT`.
 - A `SIGNED_OUT` alert has fired and stayed for more than a few minutes.
 - A brand-new gateway instance is being set up (bootstrap).
 - Callers are getting `503 SESSION_SIGNED_OUT` from the gateway.
@@ -61,9 +60,10 @@ login.
 - Your **LEGO Account** sign-in credentials — you type them yourself, into LEGO's real page. They
   are never stored, pasted into chat, or put in any file for this procedure.
 - Access to the **sign-in code email**. LEGO emails a 6-digit code to the LEGO Account address,
-  which forwards to the `bricklink-otp@legohunter.io` mailbox (and to your normal inbox). You can
+  which forwards to the dedicated sign-in code mailbox (and to your normal inbox). You can
   read the code from whichever you prefer.
-- `kubectl` access to the target environment, for the gateway-side import step.
+- The target environment's **admin token** (section 10), for the gateway-side import step, and a
+  machine on the home network or VPN: the gateway's hostname resolves only there.
 
 The session directory defaults to `D:\dev\config\bricklink-session` (override with the
 `BRICKLINK_SESSION_DIR` environment variable). It sits outside every Git repository and holds live
@@ -76,14 +76,32 @@ session cookies — treat the whole folder as a secret.
 This is what keeps the session fresh day to day. **You normally do nothing here.**
 
 - The gateway visits a signed-in page on a schedule and, in doing so, slides the renewable layers
-  forward. **(planned — phase 1)**
+  forward.
 - To confirm the session is healthy at any time:
-  **(planned — phase 1)** `GET /session` → expect `SIGNED_IN`, with recent `lastProbe` and the
+  `GET /session` → expect `SIGNED_IN`, with recent `lastProbe` and the
   per-layer expiry dates moving forward over time.
 - To force a keep-alive immediately (e.g. after a cluster event):
-  **(planned — phase 1)** `POST /session/probe`.
+  `POST /session/probe`.
 
-Until the gateway exists, the equivalent check on the PC is:
+The gateway is at `https://bricklink-web-gateway.<env>.internal.legohunter.io` (home network and
+VPN only). Reading the state is open; anything that acts needs a bearer token:
+
+```sh
+curl https://bricklink-web-gateway.sandbox.internal.legohunter.io/session
+curl -X POST -H "Authorization: Bearer <caller or admin token>" \
+     https://bricklink-web-gateway.sandbox.internal.legohunter.io/session/probe
+```
+
+| Endpoint | Token |
+|---|---|
+| `GET /session`, health, metrics | none |
+| `POST /session/probe` (and, later, the lot operations) | caller token, or the admin token |
+| `POST /admin/session/import` | admin token only |
+
+The keep-alive runs hourly. It pauses while the state is `SIGNED_OUT` (there is nothing to keep
+alive) and resumes after a session import.
+
+To check the session held on the PC itself:
 
 ```sh
 cd D:\dev\projects\lego-collection\bricklink-html\spike\homelab-79
@@ -104,13 +122,11 @@ the PC**, then **hand the session to the gateway**.
 > - `scripts/refresh-session.ps1` — run on the PC; does the whole flow (login → verify → export →
 >   import → verify → delete the export). Your only manual action is signing in to the browser
 >   window that opens.
-> - `scripts/import-session.sh` — the import half only, for running on an always-on machine with
->   kubectl such as `rasppi5-01`, after you have signed in and exported on the PC.
+> - `scripts/import-session.sh` — the import half only, for running on an always-on machine on
+>   the home network such as `rasppi5-01`, after you have signed in and exported on the PC.
 >
-> The login/verify/export steps work today. The **import** call in both scripts hits the gateway's
-> admin endpoint, which is **wired up in phase 1 (HOMELAB-90)**; until then run the PowerShell
-> script without `-DoImport` to do just the login and export. The manual steps below remain the
-> source of truth for what the scripts do.
+> Run the PowerShell script without `-DoImport` to do just the login and export. The manual steps
+> below remain the source of truth for what the scripts do.
 
 ### 5.1 Sign in on the PC
 
@@ -129,7 +145,7 @@ the PC**, then **hand the session to the gateway**.
 3. In that window, sign in the way you always do:
    - Enter your **username / email**, click **Continue**.
    - Enter your **password**, continue.
-   - LEGO emails a **6-digit code**. Read it from the `bricklink-otp` mailbox or your inbox (it is
+   - LEGO emails a **6-digit code**. Read it from the sign-in code mailbox or your inbox (it is
      in the subject line, valid for 6 minutes) and type it in.
    - Wait until you land on your signed-in BrickLink page (your store / "My BrickLink").
 
@@ -162,32 +178,39 @@ step 5.4.
 
 ### 5.3 Import it into the gateway
 
-**Wired up in phase 1 (HOMELAB-90):** the gateway exposes a session-import mechanism that takes
-`portable-state.json` over an authenticated, cluster-internal channel (reached by `kubectl
-port-forward`, since the gateway has no public route), writes it onto the gateway's volume, probes,
-and reports the result — without ever logging the file. The scripts in `scripts/` call it:
+The gateway takes `portable-state.json` on `POST /admin/session/import`, over HTTPS on its
+internal hostname and protected by the admin token. It loads the
+BrickLink and LEGO Account cookies into its browser, writes them to its volume, probes, and
+reports the result. The file is read from memory only: the gateway never stores or logs it. The
+scripts in `scripts/` do all of this:
 
-- On the PC: `pwsh scripts/refresh-session.ps1 -Namespace services-prod -DoImport`
-- On `rasppi5-01` (import half only, after copying the export over): `./scripts/import-session.sh services-prod ~/portable-state.json`
+- On the PC:
+  `powershell -File scripts\refresh-session.ps1 -Environment sandbox -DoImport`
+- On `rasppi5-01` (import half only, after copying the export over):
+  `./scripts/import-session.sh sandbox ~/portable-state.json`
 
-Both authenticate with the gateway admin token from your secret store
-(`BRICKLINK_GATEWAY_ADMIN_TOKEN`), port-forward to the pod, POST the state file to
-`/admin/session/import`, and confirm with `GET /session`.
+Both need the admin token of the environment you are importing into. The PowerShell script asks
+for it at the start with the input hidden (or reads `BRICKLINK_GATEWAY_ADMIN_TOKEN` if you set it
+first); the bash script reads that variable or a protected token file. Neither takes the token as
+a command-line argument, because shells save command lines in plain-text history. Both then POST
+the state file and confirm with `GET /session`.
 
-Until the phase-1 endpoint exists, the equivalent **proven manual copy** (what the portability test
-did on 2026-11-15) is:
+Answers from the import call:
 
-1. Copy the state file into the gateway pod's profile volume at the path the deployment expects.
-2. Restart the pod (`Recreate`), so it starts from the imported session.
+| HTTP | Meaning |
+|---|---|
+| 200 | Imported, and the gateway probed as `SIGNED_IN` |
+| 422 | Imported, but the session did not probe as signed in; the body shows the state. Sign in again on the PC and re-export |
+| 400 `INVALID_SESSION_STATE` | Not a session export, or exported from a signed-out browser. Nothing was changed |
+| 401 `ADMIN_TOKEN_REQUIRED` | Admin token missing or wrong |
+| 503 `ADMIN_TOKEN_NOT_CONFIGURED` | The gateway has no admin token (see section 10) |
 
-Either way, the session now lives on the **volume**, so ordinary pod restarts and reschedules do
-**not** need another login.
+The session now lives on the **volume**, so ordinary pod restarts and reschedules do **not** need
+another login.
 
 ### 5.4 Verify, then destroy the export
 
-1. Confirm the gateway is signed in:
-   **(planned — phase 1)** `GET /session` → `SIGNED_IN`.
-   Until then, confirm from the pod with the same probe the spike uses.
+1. Confirm the gateway is signed in: `GET /session` → `SIGNED_IN`.
 
 2. **Delete the export from everywhere it touched:**
 
@@ -232,9 +255,11 @@ tested (tracked on HOMELAB-90):
 | Symptom | Likely cause | Action |
 |---|---|---|
 | `login.mjs` opens but BrickLink never shows the code step | Wrong username/password, or you closed the Continue step too fast | Re-run; make sure you reach the password field and submit it |
-| Code email never arrives | Code went only to the forwarder, or landed in spam | Check the `bricklink-otp` mailbox and your inbox spam; codes expire in 6 minutes, so request a fresh one if needed |
+| Code email never arrives | Code went only to the forwarder, or landed in spam | Check the sign-in code mailbox and your inbox spam; codes expire in 6 minutes, so request a fresh one if needed |
 | `check.mjs` says `NOT SIGNED IN` straight after login | The sign-in did not complete, or you closed the window too early | Repeat section 5.1, and wait until you clearly see your signed-in BrickLink page |
-| Gateway still `SIGNED_OUT` after import | State file not placed where the deployment expects, or pod not restarted | Re-check the volume path; restart the pod; verify the file was the one you just exported |
+| Import answers 422 / gateway still `SIGNED_OUT` | The exported session was not signed in, or BrickLink did not accept it from the cluster | Run `node check.mjs --http` on the PC; if that is signed in, re-export and import again; if not, sign in again |
+| Import answers 503 `ADMIN_TOKEN_NOT_CONFIGURED` | The environment's admin token secret is missing, or the pod started before it existed | Create the secret (section 10) and restart the pod |
+| The gateway's hostname does not resolve | You are off the home network | Connect to the VPN, or run the import on `rasppi5-01` |
 | Everything imports fine but signs out again within minutes | Another session may be displacing this one (section 6), or an IP change | Check the other environments; check whether the home public IP changed |
 | `GET /session` shows `UNKNOWN`, not `SIGNED_OUT` | BrickLink was unreachable | Do **not** log in; wait and re-probe — this is not a sign-out |
 
@@ -248,3 +273,44 @@ full manual login is expected only at **bootstrap** and when the session **fully
 with the observed figure once it is known. The ~3-month LEGO Account layer (expiry around
 2027-02-14 at the time of writing) is the current best guess for a worst-case "must log in again"
 horizon if nothing else forces it sooner.
+
+---
+
+## 10. One-time setup of an environment
+
+Needed once per environment (`sandbox`, `dev`, `prod`), before the first deploy there.
+
+1. **Tokens.** In Infisical, in that environment (not Global), create a secret named
+   `bricklink-web-gateway.yml` whose value is this YAML, with two different long random values of
+   your own:
+
+   ```yaml
+   bricklink:
+     web-gateway:
+       admin-token: <long random value>
+       caller-token: <another long random value>
+   ```
+
+   - **admin-token** replaces the session (`/admin/session/import`). Only you use it.
+   - **caller-token** is for the services that use the gateway (`lego-data-ingress`, in a later
+     phase). It cannot replace the session.
+
+   The file reaches the pod under `/etc/.credentials`, like the other services' credential files,
+   and is read at startup: restart the pod after changing it. Without it the gateway still runs
+   and `GET /session` works, but every token-protected endpoint answers 503. Each environment has
+   its own tokens; never copy one between environments.
+
+2. **Profile volume and network policy.** The deploy pipeline may not create these, so an
+   administrator applies them once:
+
+   ```sh
+   kubectl --context lcms-admin -n services-<env> apply -f kubernetes/cluster-setup/profile-volume.yaml
+   kubectl --context lcms-admin -n services-<env> apply -f kubernetes/cluster-setup/network-policy.yaml
+   ```
+
+   The volume holds the signed-in session. Deleting the claim deletes the session.
+
+3. **Quay repository.** `quay.io/tvattima/bricklink-web-gateway` must exist, with Write permission
+   for the `tvattima+github` robot (once, not per environment).
+
+4. **First sign-in.** Deploy, then run Procedure B (section 5) against that environment.

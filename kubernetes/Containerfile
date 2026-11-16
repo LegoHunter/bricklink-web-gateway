@@ -1,0 +1,17 @@
+# The Playwright image carries the Chromium build (and its system libraries) that Playwright for
+# Java expects, plus a Java 21 runtime. It is published for arm64, the cluster's architecture.
+# The tag must match <playwright.version> in pom.xml.
+#
+# Exception to the service standard's "JRE only" rule: this image also contains a JDK and Maven,
+# because Playwright publishes no JRE-only variant and the standard allows no RUN steps to remove
+# them (the arm64 image is built on amd64 runners without emulation).
+FROM mcr.microsoft.com/playwright/java:v1.56.0-noble
+ARG JAR_FILE=target/*.jar
+COPY ${JAR_FILE} app.jar
+# Run as an unprivileged, numeric user so Kubernetes can verify runAsNonRoot. The UID has no
+# /etc/passwd entry, hence HOME=/tmp: Chromium and the Playwright driver write their caches there.
+ENV HOME=/tmp
+# The browsers are already in the image; never download one at runtime.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+USER 10001:10001
+ENTRYPOINT ["java","-jar","/app.jar"]
