@@ -41,6 +41,15 @@ public class PlaywrightBrowserSession implements BrowserSession {
     private static final int FIREWALL_CHALLENGE = 202;
     private static final double CHALLENGE_SETTLE_TIMEOUT_MS = 15_000;
 
+    /**
+     * Chromium flags. The profile lives on a small persistent volume, so the HTTP cache, the one part
+     * of the profile that grows with use, gets a fixed ceiling (50 MB).
+     */
+    static final List<String> LAUNCH_ARGS = List.of(
+            // Pods have a small /dev/shm; Chromium falls back to /tmp with this flag.
+            "--disable-dev-shm-usage",
+            "--disk-cache-size=" + 50 * 1024 * 1024);
+
     private final GatewayProperties properties;
 
     // Only ever touched on the OperationQueue thread.
@@ -196,8 +205,7 @@ public class PlaywrightBrowserSession implements BrowserSession {
                     .setEnv(Map.of("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")));
             BrowserType.LaunchPersistentContextOptions options = new BrowserType.LaunchPersistentContextOptions()
                     .setHeadless(properties.headless())
-                    // Pods have a small /dev/shm; Chromium falls back to /tmp with this flag.
-                    .setArgs(List.of("--disable-dev-shm-usage"));
+                    .setArgs(LAUNCH_ARGS);
             if (properties.browserChannel() != null && !properties.browserChannel().isBlank()) {
                 options.setChannel(properties.browserChannel());
             }

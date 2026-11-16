@@ -64,6 +64,8 @@ class DeploymentManifestTest {
                 .contains("profile-dir: /var/lib/bricklink-web-gateway/profile");
         assertThat(yaml("cluster-setup/profile-volume.yaml").at("/metadata/name").asText()).isEqualTo(APP + "-profile");
         assertThat(yaml("cluster-setup/profile-volume.yaml").at("/spec/accessModes/0").asText()).isEqualTo("ReadWriteOnce");
+        // Comfortably above the browser's 50 MB cache ceiling.
+        assertThat(yaml("cluster-setup/profile-volume.yaml").at("/spec/resources/requests/storage").asText()).isEqualTo("128Mi");
     }
 
     @Test

@@ -5,6 +5,11 @@
 #
 #   kubectl --context lcms-admin -n services-<env> apply -f kubernetes/cluster-setup/profile-volume.yaml
 #
+# Size: the profile measured 1.2 MiB in SANDBOX on 2026-11-16 (phase 1, no page loads). The browser's
+# HTTP cache is capped at 50 MB (PlaywrightBrowserSession), so 128Mi leaves ample room. On local-path
+# the size is only a label: it is neither reserved nor enforced. A claim cannot be shrunk in place,
+# so the SANDBOX claim created at 1Gi stays as it is.
+#
 # Storage class local-path keeps the data on one node's disk, so the pod is tied to that node. If
 # the node is lost, so is the session: sign in again and import (runbook section 5). Deleting this
 # claim deletes the session (reclaim policy Delete).
@@ -24,4 +29,4 @@ spec:
   storageClassName: local-path
   resources:
     requests:
-      storage: 1Gi
+      storage: 128Mi

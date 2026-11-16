@@ -18,6 +18,11 @@ class PlaywrightBrowserSessionTest {
     }
 
     @Test
+    void browserCacheHasACeilingSoTheProfileVolumeStaysSmall() {
+        assertThat(PlaywrightBrowserSession.LAUNCH_ARGS).contains("--disk-cache-size=52428800", "--disable-dev-shm-usage");
+    }
+
+    @Test
     void failureTextCopesWithNoMessage() {
         assertThat(PlaywrightBrowserSession.describe(new IllegalStateException())).isEqualTo("IllegalStateException");
     }
