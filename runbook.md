@@ -100,6 +100,18 @@ go to section 5.
 This is the real "recreate the token from a fresh login" procedure. It has two halves: **sign in on
 the PC**, then **hand the session to the gateway**.
 
+> **Scripted shortcut.** The steps below are wrapped by two scripts in `scripts/`:
+> - `scripts/refresh-session.ps1` — run on the PC; does the whole flow (login → verify → export →
+>   import → verify → delete the export). Your only manual action is signing in to the browser
+>   window that opens.
+> - `scripts/import-session.sh` — the import half only, for running on an always-on machine with
+>   kubectl such as `rasppi5-01`, after you have signed in and exported on the PC.
+>
+> The login/verify/export steps work today. The **import** call in both scripts hits the gateway's
+> admin endpoint, which is **wired up in phase 1 (HOMELAB-90)**; until then run the PowerShell
+> script without `-DoImport` to do just the login and export. The manual steps below remain the
+> source of truth for what the scripts do.
+
 ### 5.1 Sign in on the PC
 
 1. Open a terminal on the PC and go to the spike directory:
@@ -150,16 +162,20 @@ step 5.4.
 
 ### 5.3 Import it into the gateway
 
-**(planned — phase 1, HOMELAB-90):** the gateway will expose a session-import mechanism that takes
-`portable-state.json` over an authenticated, cluster-internal channel, writes it onto the gateway's
-volume, and never logs it. The intended shape:
+**Wired up in phase 1 (HOMELAB-90):** the gateway exposes a session-import mechanism that takes
+`portable-state.json` over an authenticated, cluster-internal channel (reached by `kubectl
+port-forward`, since the gateway has no public route), writes it onto the gateway's volume, probes,
+and reports the result — without ever logging the file. The scripts in `scripts/` call it:
 
-1. `kubectl --context <env> -n <services-ns>` port-forward to the gateway, or use its admin import
-   endpoint, and upload `portable-state.json`.
-2. The gateway loads it, runs a probe, and reports the result.
+- On the PC: `pwsh scripts/refresh-session.ps1 -Namespace services-prod -DoImport`
+- On `rasppi5-01` (import half only, after copying the export over): `./scripts/import-session.sh services-prod ~/portable-state.json`
 
-Until that mechanism is built, the equivalent **proven manual copy** (what the portability test did
-on 2026-11-15) is:
+Both authenticate with the gateway admin token from your secret store
+(`BRICKLINK_GATEWAY_ADMIN_TOKEN`), port-forward to the pod, POST the state file to
+`/admin/session/import`, and confirm with `GET /session`.
+
+Until the phase-1 endpoint exists, the equivalent **proven manual copy** (what the portability test
+did on 2026-11-15) is:
 
 1. Copy the state file into the gateway pod's profile volume at the path the deployment expects.
 2. Restart the pod (`Recreate`), so it starts from the imported session.
