@@ -9,6 +9,17 @@ spring:
       max-file-size: 2MB
       max-request-size: 2MB
 
+# /actuator/info reports the full git and build details, the same as lego-data-service.
+management:
+  info:
+    git:
+      enabled: true
+      mode: full
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
 bricklink:
   web-gateway:
     base-url: https://www.bricklink.com
