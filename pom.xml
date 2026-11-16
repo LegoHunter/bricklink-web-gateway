@@ -19,6 +19,10 @@
         <!-- Must match the Playwright base image tag in kubernetes/Containerfile: the image carries
              the Chromium build this driver version expects. -->
         <playwright.version>1.56.0</playwright.version>
+        <!-- Which platforms' Playwright driver (a Node runtime, about 40 MB each) go into the jar.
+             Playwright's own bundle ships five; the cluster runs linux-arm64 only. Outside CI the
+             local-driver profile below adds Windows, for running the gateway on a developer PC. -->
+        <playwright.driver.platforms>driver/linux-arm64/**</playwright.driver.platforms>
         <github.organization>LegoHunter</github.organization>
         <github.repo.url>https://github.com/${github.organization}/bricklink-web-gateway.git</github.repo.url>
     </properties>
@@ -49,6 +53,14 @@
             <groupId>com.microsoft.playwright</groupId>
             <artifactId>playwright</artifactId>
             <version>${playwright.version}</version>
+            <exclusions>
+                <!-- The drivers for every platform (196 MB). The platforms actually needed are
+                     copied out of it into the jar by maven-dependency-plugin below. -->
+                <exclusion>
+                    <groupId>com.microsoft.playwright</groupId>
+                    <artifactId>driver-bundle</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -90,6 +102,33 @@
 
     <build>
         <plugins>
+            <!-- Copies Playwright's driver loader and the drivers for the wanted platforms out of
+                 driver-bundle into the application's classes. Playwright finds them on the
+                 classpath exactly as it finds the stock bundle. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>unpack-playwright-driver</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.microsoft.playwright</groupId>
+                                    <artifactId>driver-bundle</artifactId>
+                                    <version>${playwright.version}</version>
+                                    <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                                    <includes>com/microsoft/playwright/impl/driver/jar/**,${playwright.driver.platforms}</includes>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- Writes git.properties, which /actuator/info reports (same as lego-data-service). -->
             <plugin>
                 <groupId>pl.project13.maven</groupId>
@@ -127,5 +166,22 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Anywhere but CI (GitHub Actions sets CI=true): also include the Windows driver, so the
+             gateway can start a browser on a developer PC. For another platform, override the
+             property, e.g. -Dplaywright.driver.platforms=driver/linux-arm64/**,driver/mac-arm64/** -->
+        <profile>
+            <id>local-driver</id>
+            <activation>
+                <property>
+                    <name>!env.CI</name>
+                </property>
+            </activation>
+            <properties>
+                <playwright.driver.platforms>driver/linux-arm64/**,driver/win32_x64/**</playwright.driver.platforms>
+            </properties>
+        </profile>
+    </profiles>
 
 </project>
