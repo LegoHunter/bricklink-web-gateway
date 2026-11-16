@@ -1,0 +1,7 @@
+# A developer PC. There is no bundled Chromium outside the container image, so use installed Chrome.
+bricklink:
+  web-gateway:
+    browser-channel: chrome
+    profile-dir: ${BRICKLINK_GATEWAY_PROFILE_DIR:${user.home}/.bricklink-web-gateway/profile}
+    admin-token: ${BRICKLINK_GATEWAY_ADMIN_TOKEN:}
+    caller-token: ${BRICKLINK_GATEWAY_CALLER_TOKEN:}

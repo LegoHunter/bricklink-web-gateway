@@ -1,0 +1,34 @@
+spring:
+  profiles:
+    default: local
+  application:
+    name: BrickLink Web Gateway
+  servlet:
+    multipart:
+      # The session import is one small JSON file.
+      max-file-size: 2MB
+      max-request-size: 2MB
+
+bricklink:
+  web-gateway:
+    base-url: https://www.bricklink.com
+    # A page only a signed-in user can open. The probe and the keep-alive visit it.
+    probe-path: /my.asp
+    # Holds live session cookies: treat the directory as a secret. Each profile sets its own.
+    profile-dir: ./.bricklink-web-gateway/profile
+    # Empty = Playwright's bundled Chromium (the container image). "chrome" = an installed Chrome.
+    browser-channel: ""
+    headless: true
+    min-request-gap: 2s
+    browser-idle-timeout: 5m
+    operation-timeout: 2m
+    navigation-timeout: 45s
+    # Bearer tokens. Never set them in this file: each environment reads its own from its secret store.
+    # admin-token: replaces the session (POST /admin/session/import). Empty = that endpoint is shut.
+    # caller-token: for the services that use the gateway. Empty = only the admin token passes.
+    admin-token: ""
+    caller-token: ""
+    keep-alive:
+      enabled: true
+      interval: 60m
+      initial-delay: 30s

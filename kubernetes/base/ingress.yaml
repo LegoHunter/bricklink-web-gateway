@@ -1,0 +1,26 @@
+# HTTPS route on the internal hostname, like the other LCMS services. Being able to reach the
+# gateway is not enough to use it: every endpoint that acts needs a bearer token (TokenAuthorizer).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: bricklink-web-gateway
+  annotations:
+    kubernetes.io/ingress.class: traefik
+  labels:
+    app.kubernetes.io/name: bricklink-web-gateway
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: lego-platform
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    # Placeholders: every overlay sets its own host and certificate.
+    - match: Host(`bricklink-web-gateway.set-by-overlay.invalid`)
+      kind: Rule
+      services:
+        - name: bricklink-web-gateway
+          port: 8080
+      middlewares:
+        - name: default-headers
+  tls:
+    secretName: set-by-overlay

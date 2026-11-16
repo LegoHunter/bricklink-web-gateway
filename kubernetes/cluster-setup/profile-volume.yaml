@@ -1,0 +1,27 @@
+# The browser profile volume: it holds the gateway's signed-in BrickLink session.
+#
+# Applied ONCE per namespace by an administrator, never by the deploy pipeline (the deploy runner
+# has no rights on PersistentVolumeClaims, and the session must outlive every deploy):
+#
+#   kubectl --context lcms-admin -n services-<env> apply -f kubernetes/cluster-setup/profile-volume.yaml
+#
+# Storage class local-path keeps the data on one node's disk, so the pod is tied to that node. If
+# the node is lost, so is the session: sign in again and import (runbook section 5). Deleting this
+# claim deletes the session (reclaim policy Delete).
+#
+# The volume is a secret. Never copy it between environments; each environment signs in on its own.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bricklink-web-gateway-profile
+  labels:
+    app.kubernetes.io/name: bricklink-web-gateway
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: lego-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

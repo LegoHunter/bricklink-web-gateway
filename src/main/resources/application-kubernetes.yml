@@ -1,0 +1,27 @@
+import-path: /etc/.credentials
+
+spring:
+  main:
+    banner-mode: off
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        # Deliberately not the session state: a signed-out gateway must stay Ready, or the session
+        # import that fixes it could not reach the pod.
+        readiness:
+          include: readinessState
+
+bricklink:
+  web-gateway:
+    # The persistent volume (see kubernetes/base/deployment.yaml).
+    profile-dir: /var/lib/bricklink-web-gateway/profile
