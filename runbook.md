@@ -189,9 +189,11 @@ scripts in `scripts/` do all of this:
 - On `rasppi5-01` (import half only, after copying the export over):
   `./scripts/import-session.sh sandbox ~/portable-state.json`
 
-Both read the admin token from `BRICKLINK_GATEWAY_ADMIN_TOKEN` (the bash script also accepts a
-protected token file), POST the state file, and confirm with `GET /session`. Use the admin token
-of the environment you are importing into.
+Both need the admin token of the environment you are importing into. The PowerShell script asks
+for it at the start with the input hidden (or reads `BRICKLINK_GATEWAY_ADMIN_TOKEN` if you set it
+first); the bash script reads that variable or a protected token file. Neither takes the token as
+a command-line argument, because shells save command lines in plain-text history. Both then POST
+the state file and confirm with `GET /session`.
 
 Answers from the import call:
 

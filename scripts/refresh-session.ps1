@@ -24,9 +24,12 @@
   See runbook.md section 5.
 
 .NOTES
-  The admin token must come from your secret store, not the command line. Set it as
-  an environment variable before running:  $env:BRICKLINK_GATEWAY_ADMIN_TOKEN = "..."
-  Each environment has its own admin token.
+  With -DoImport the script needs the environment's admin token (each environment has
+  its own). It asks for it at the start, with the input hidden, so the token never
+  lands in your PowerShell history. To skip the question, set it beforehand:
+      $env:BRICKLINK_GATEWAY_ADMIN_TOKEN = "..."
+  There is deliberately no command-line parameter for the token: PowerShell saves every
+  command line, token included, in a plain-text history file.
 #>
 [CmdletBinding()]
 param(
@@ -44,6 +47,22 @@ $ErrorActionPreference = "Stop"
 $state = Join-Path $SessionDir "portable-state.json"
 if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
   $BaseUrl = "https://bricklink-web-gateway.$Environment.internal.legohunter.io"
+}
+
+# Get the admin token before anything else, so a missing token does not waste a sign-in.
+$token = $null
+if ($DoImport) {
+  $token = $env:BRICKLINK_GATEWAY_ADMIN_TOKEN
+  if ([string]::IsNullOrWhiteSpace($token)) {
+    $secure = Read-Host -AsSecureString "Admin token for the $Environment gateway (input hidden)"
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    try { $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+  }
+  if ([string]::IsNullOrWhiteSpace($token)) {
+    throw "No admin token given. Nothing was changed."
+  }
+  $token = $token.Trim()
 }
 
 # --- 1-3: sign in on this PC and export the session -----------------------------
@@ -74,11 +93,6 @@ if (-not $DoImport) {
 
 # --- 4-5: import into the running gateway ---------------------------------------
 try {
-  $token = $env:BRICKLINK_GATEWAY_ADMIN_TOKEN
-  if ([string]::IsNullOrWhiteSpace($token)) {
-    throw "Set `$env:BRICKLINK_GATEWAY_ADMIN_TOKEN (the $Environment admin token, from your secret store) before importing."
-  }
-
   Write-Host "`n[4/6] Importing the session into $BaseUrl ..." -ForegroundColor Cyan
   # The token goes to curl on standard input, so it never appears in the process list.
   "header = `"Authorization: Bearer $token`"" | curl.exe --config - --fail-with-body --silent --show-error `
