@@ -1,0 +1,12 @@
+# Test-only settings, read in addition to the main application.yml.
+#
+# The BrickLink REST client refuses to start without its four keys. No test calls the real API
+# (the stockroom lookup is replaced by a fake), so these are placeholders, not credentials.
+bricklink:
+  rest:
+    consumer:
+      key: placeholder-for-tests
+      secret: placeholder-for-tests
+    token:
+      value: placeholder-for-tests
+      secret: placeholder-for-tests

@@ -23,6 +23,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param callerToken        Bearer token for the services that use the gateway. Empty means only the
  *                           admin token passes.
  * @param keepAlive          Scheduled keep-alive visit.
+ * @param guard              Which lots this environment may change.
  */
 @ConfigurationProperties(prefix = "bricklink.web-gateway")
 public record GatewayProperties(
@@ -37,7 +38,8 @@ public record GatewayProperties(
         @DefaultValue("45s") Duration navigationTimeout,
         @DefaultValue("") String adminToken,
         @DefaultValue("") String callerToken,
-        @DefaultValue KeepAlive keepAlive) {
+        @DefaultValue KeepAlive keepAlive,
+        @DefaultValue Guard guard) {
 
     /**
      * @param enabled      Run the scheduled keep-alive.
@@ -50,6 +52,18 @@ public record GatewayProperties(
             @DefaultValue("30s") Duration initialDelay) {
     }
 
+    /**
+     * Every environment shares one BrickLink account, so a lower environment may only change lots in
+     * its own stockroom. With neither value set, the gateway changes no lot at all.
+     *
+     * @param production  {@code true} only in production: no stockroom restriction.
+     * @param stockroomId The stockroom letter this environment owns ({@code C} sandbox, {@code B} dev).
+     */
+    public record Guard(
+            @DefaultValue("false") boolean production,
+            @DefaultValue("") String stockroomId) {
+    }
+
     public String probeUrl() {
         return baseUrl + probePath;
     }
@@ -59,7 +73,7 @@ public record GatewayProperties(
     public String toString() {
         return "GatewayProperties[baseUrl=" + baseUrl + ", probePath=" + probePath + ", profileDir=" + profileDir
                 + ", browserChannel=" + browserChannel + ", headless=" + headless + ", adminToken="
-                + shown(adminToken) + ", callerToken=" + shown(callerToken) + ", keepAlive=" + keepAlive + "]";
+                + shown(adminToken) + ", callerToken=" + shown(callerToken) + ", keepAlive=" + keepAlive + ", guard=" + guard + "]";
     }
 
     private static String shown(String token) {

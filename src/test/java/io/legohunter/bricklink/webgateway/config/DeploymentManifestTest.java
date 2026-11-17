@@ -146,6 +146,17 @@ class DeploymentManifestTest {
         assertThat(profile.at("/lego/environment/production").asBoolean(false)).isEqualTo(env.equals("prod"));
         assertThat(profile.at("/spring/config/import/0").asText())
                 .isEqualTo("optional:file:${import-path}/bricklink-web-gateway.yml");
+        assertThat(profile.at("/spring/config/import/1").asText())
+                .isEqualTo("optional:file:${import-path}/bricklink-client-api-keys.yml");
+
+        // The stockroom guard: A is reserved for PROD, B for DEV, C for SANDBOX.
+        JsonNode guard = profile.at("/bricklink/web-gateway/guard");
+        assertThat(guard.path("production").asBoolean(false)).isEqualTo(env.equals("prod"));
+        assertThat(guard.path("stockroom-id").asText("")).isEqualTo(switch (env) {
+            case "sandbox" -> "C";
+            case "dev" -> "B";
+            default -> "";
+        });
     }
 
     @Test
