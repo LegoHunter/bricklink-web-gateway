@@ -68,6 +68,7 @@ class TokenAuthorizerTest {
     private static GatewayProperties properties(String adminToken, String callerToken) {
         return new GatewayProperties("https://www.bricklink.com", "/my.asp", Path.of("unused"), "", true,
                 Duration.ZERO, Duration.ofMinutes(5), Duration.ofSeconds(10), Duration.ofSeconds(10), adminToken,
-                callerToken, new GatewayProperties.KeepAlive(false, Duration.ofHours(1), Duration.ZERO));
+                callerToken, new GatewayProperties.KeepAlive(false, Duration.ofHours(1), Duration.ZERO),
+                new GatewayProperties.Guard(false, "C"));
     }
 }

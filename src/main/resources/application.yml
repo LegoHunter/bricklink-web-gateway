@@ -5,9 +5,10 @@ spring:
     name: BrickLink Web Gateway
   servlet:
     multipart:
-      # The session import is one small JSON file.
-      max-file-size: 2MB
-      max-request-size: 2MB
+      # A lot image or the session import file. The lot image has its own, lower limit
+      # (bricklink.web-gateway.max-image-size); this one only has to be above it.
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 # /actuator/info reports the full git and build details, the same as lego-data-service.
 management:
@@ -21,6 +22,10 @@ management:
         include: health,info,metrics,prometheus
 
 bricklink:
+  # The official REST API, read-only here: the stockroom guard asks it which stockroom a lot is in.
+  # The keys come from bricklink-client-api-keys.yml, the copy every LCMS service shares.
+  rest:
+    uri: https://api.bricklink.com/api/store/v1
   web-gateway:
     base-url: https://www.bricklink.com
     # A page only a signed-in user can open. The probe and the keep-alive visit it.
@@ -43,3 +48,12 @@ bricklink:
       enabled: true
       interval: 60m
       initial-delay: 30s
+    # Largest lot image accepted. BrickLink turns away large files, and a replace has already deleted
+    # the old image by then. The platform scales the primary photo to at most 2,000,000 bytes
+    # (lego-imaging); this leaves half a megabyte of room above that.
+    max-image-size: 2500000B
+    # Which lots this environment may change. Each environment profile sets its own. With neither
+    # value set (as here) the gateway changes no lot.
+    guard:
+      production: false
+      stockroom-id: ""

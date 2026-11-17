@@ -4,7 +4,16 @@ spring:
       # Holds bricklink.web-gateway.admin-token and caller-token for this environment. Optional so
       # the gateway starts before the secret exists; without it every token-protected endpoint is shut.
       - optional:file:${import-path}/bricklink-web-gateway.yml
+      # The shared BrickLink REST API keys (Infisical Global). Optional so the gateway starts without
+      # them; the stockroom guard then refuses every write.
+      - optional:file:${import-path}/bricklink-client-api-keys.yml
 
 lego:
   environment:
     code: sandbox
+
+# SANDBOX owns stockroom C (A is reserved for PROD, B for DEV). It may change no other lot.
+bricklink:
+  web-gateway:
+    guard:
+      stockroom-id: C

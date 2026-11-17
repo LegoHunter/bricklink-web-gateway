@@ -1,4 +1,9 @@
 # A developer PC. There is no bundled Chromium outside the container image, so use installed Chrome.
+spring:
+  config:
+    import:
+      - optional:file:/dev/config/bricklink-client-api-keys.yml
+
 bricklink:
   web-gateway:
     browser-channel: chrome

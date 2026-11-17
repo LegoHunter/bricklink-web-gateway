@@ -19,6 +19,7 @@
         <!-- Must match the Playwright base image tag in kubernetes/Containerfile: the image carries
              the Chromium build this driver version expects. -->
         <playwright.version>1.56.0</playwright.version>
+        <bricklink-rest.version>2.0.0-SNAPSHOT</bricklink-rest.version>
         <!-- Which platforms' Playwright driver (a Node runtime, about 40 MB each) go into the jar.
              Playwright's own bundle ships five; the cluster runs linux-arm64 only. Outside CI the
              local-driver profile below adds Windows, for running the gateway on a developer PC. -->
@@ -33,10 +34,33 @@
         <developerConnection>scm:git:${github.repo.url}</developerConnection>
     </scm>
 
+    <repositories>
+        <repository>
+            <id>central</id>
+            <url>https://repo1.maven.org/maven2</url>
+        </repository>
+        <!-- The LCMS libraries (bricklink-rest) are published to GitHub Packages. -->
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/${github.organization}/*</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- The official BrickLink REST API client, the same one lego-data-ingress uses. The gateway
+             only reads one lot's stockroom through it, for the environment guard. -->
+        <dependency>
+            <groupId>com.bricklink.api</groupId>
+            <artifactId>bricklink-spring-boot-starter</artifactId>
+            <version>${bricklink-rest.version}</version>
         </dependency>
 
         <dependency>

@@ -12,10 +12,14 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.PlaywrightException;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.Cookie;
+import com.microsoft.playwright.options.FilePayload;
+import com.microsoft.playwright.options.FormData;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.RequestOptions;
 import com.microsoft.playwright.options.SameSiteAttribute;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import io.legohunter.bricklink.webgateway.config.GatewayProperties;
 import io.legohunter.bricklink.webgateway.logging.SafeUrl;
 import org.slf4j.Logger;
@@ -102,6 +106,104 @@ public class PlaywrightBrowserSession implements BrowserSession {
             }
         } finally {
             page.close();
+        }
+    }
+
+    @Override
+    public HttpResult get(String url) {
+        try {
+            BrowserContext ctx = context();
+            HttpResult result = read(ctx.request().get(url, options()));
+            if (result.httpStatus() == FIREWALL_CHALLENGE) {
+                log.info("Firewall challenge on {}; loading the page so the browser can answer it", SafeUrl.of(url));
+                answerChallenge(ctx, url);
+                result = read(ctx.request().get(url, options()));
+            }
+            return result;
+        } catch (PlaywrightException e) {
+            throw failure("Browser request failed", e);
+        }
+    }
+
+    @Override
+    public HttpResult postForm(String url, Map<String, String> form) {
+        try {
+            FormData data = FormData.create();
+            form.forEach(data::set);
+            return read(context().request().post(url, options().setForm(data)));
+        } catch (PlaywrightException e) {
+            throw failure("Browser form post failed", e);
+        }
+    }
+
+    @Override
+    public HttpResult postFile(String url, String referer, String fieldName, FilePart file) {
+        try {
+            FormData data = FormData.create()
+                    .set(fieldName, new FilePayload(file.fileName(), file.mimeType(), file.content()));
+            return read(context().request().post(url, options().setHeader("referer", referer).setMultipart(data)));
+        } catch (PlaywrightException e) {
+            throw failure("Browser file post failed", e);
+        }
+    }
+
+    @Override
+    public String submitPage(String pageUrl, String readySelector, List<PageAction> actions, String submitSelector,
+                             String responseUrlPart) {
+        Page page = null;
+        try {
+            page = context().newPage();
+            // A confirmation dialog would block the page; the submit was asked for, so accept it.
+            page.onDialog(dialog -> dialog.accept());
+            page.navigate(pageUrl);
+            try {
+                page.waitForSelector(readySelector, new Page.WaitForSelectorOptions().setState(WaitForSelectorState.ATTACHED));
+            } catch (PlaywrightException e) {
+                throw new PageShapeException("The page did not show its form (ended at " + SafeUrl.of(page.url()) + ")");
+            }
+            for (PageAction action : actions) {
+                String selector = switch (action) {
+                    case PageAction.Check check -> check.selector();
+                    case PageAction.Fill fill -> fill.selector();
+                };
+                if (page.locator(selector).count() == 0) {
+                    throw new PageShapeException("The page has no control " + selector);
+                }
+                switch (action) {
+                    case PageAction.Check check -> page.check(check.selector());
+                    case PageAction.Fill fill -> page.fill(fill.selector(), fill.value());
+                }
+            }
+            if (page.locator(submitSelector).count() == 0) {
+                throw new PageShapeException("The page has no submit control " + submitSelector);
+            }
+            Page submitting = page;
+            Response response = page.waitForResponse(
+                    candidate -> candidate.url().contains(responseUrlPart),
+                    () -> submitting.locator(submitSelector).first().click());
+            return response.text();
+        } catch (PlaywrightException e) {
+            throw failure("Submitting the page failed", e);
+        } finally {
+            if (page != null) {
+                try {
+                    page.close();
+                } catch (PlaywrightException closeFailure) {
+                    log.warn("Closing the page failed: {}", describe(closeFailure));
+                }
+            }
+        }
+    }
+
+    private RequestOptions options() {
+        return RequestOptions.create().setFailOnStatusCode(false).setTimeout(properties.navigationTimeout().toMillis());
+    }
+
+    private static HttpResult read(APIResponse response) {
+        try {
+            return new HttpResult(response.status(), response.url(), response.text());
+        } finally {
+            response.dispose();
         }
     }
 

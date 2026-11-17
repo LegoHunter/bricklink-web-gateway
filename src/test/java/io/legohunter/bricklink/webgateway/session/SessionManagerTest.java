@@ -33,7 +33,8 @@ class SessionManagerTest {
     private final OperationQueue queue = new OperationQueue(Duration.ZERO, Duration.ofSeconds(10));
     private final GatewayProperties properties = new GatewayProperties("https://www.bricklink.com", "/my.asp",
             Path.of("unused"), "", true, Duration.ZERO, Duration.ofMinutes(5), Duration.ofSeconds(10),
-            Duration.ofSeconds(10), "", "", new GatewayProperties.KeepAlive(false, Duration.ofHours(1), Duration.ZERO));
+            Duration.ofSeconds(10), "", "", new GatewayProperties.KeepAlive(false, Duration.ofHours(1), Duration.ZERO),
+            new GatewayProperties.Guard(false, "C"));
     private final SessionManager sessions = new SessionManager(browser, queue, properties, clock, meters);
 
     @AfterEach
