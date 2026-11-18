@@ -229,14 +229,22 @@ another login.
 
 ## 6. One-account / concurrency note
 
-All environments share **one** BrickLink account. It is not yet confirmed whether signing in a new
-instance (a new environment's gateway, or your PC) signs **out** the other sessions. Until that is
-tested (tracked on HOMELAB-90):
+All environments share **one** BrickLink account. Tested on 2026-11-18: a new sign-in does **not**
+sign the others out. DEV was signed in with a fresh login of its own, and the SANDBOX gateway and
+the session on the PC were still signed in when probed afterwards. Whether separate sign-ins keep
+coexisting over weeks has not been observed yet, so the check stays part of the procedure:
 
 - After importing a session into one environment, check that the **other** environments' gateways
   are still `SIGNED_IN`.
-- If a new sign-in displaces an existing one, you have hit the concurrency limit — stop, and raise
-  it, because it affects the one-instance-per-environment design.
+- If a new sign-in does displace an existing one, stop and raise it, because it affects the
+  one-instance-per-environment design.
+
+**One sign-in per environment.** `login.mjs` signs in only when its browser profile is signed out;
+a profile that is already signed in is exported as it is. To give an environment a sign-in of its
+own, give it its own profile folder:
+`scriptsefresh-session.ps1 -Environment dev -SessionDir D:\dev\configricklink-session-dev -DoImport`.
+As of 2026-11-18: SANDBOX runs on the sign-in held in `D:\dev\configricklink-session`, DEV on
+the one in `D:\dev\configricklink-session-dev`.
 
 ---
 
