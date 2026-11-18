@@ -40,7 +40,8 @@ param(
   # without a new login.
   [string]$SessionDir  = "D:\dev\config\bricklink-session",
   # The Node scripts that drive the browser on this PC (scripts\session in this repository).
-  [string]$ScriptsDir  = (Join-Path $PSScriptRoot "session"),
+  # Empty means the session folder next to this script.
+  [string]$ScriptsDir  = "",
   # Override only to reach the gateway some other way (for example a local run).
   [string]$BaseUrl     = "",
   # Omit to stop after the sign-in and export.
@@ -48,6 +49,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($ScriptsDir)) {
+  # Resolved here, not in the parameter default: Windows PowerShell leaves $PSScriptRoot empty there.
+  $ScriptsDir = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "session"
+}
+if (-not (Test-Path (Join-Path $ScriptsDir "login.mjs"))) {
+  throw "The sign-in scripts were not found in $ScriptsDir."
+}
 $state = Join-Path $SessionDir "portable-state.json"
 if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
   $BaseUrl = "https://bricklink-web-gateway.$Environment.internal.legohunter.io"
