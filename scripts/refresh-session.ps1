@@ -35,6 +35,9 @@
 param(
   [ValidateSet("sandbox", "dev", "prod")]
   [string]$Environment = "prod",
+  # Holds the browser profile of one sign-in. Give each environment its own directory when each
+  # should have its own sign-in: a profile that is already signed in is exported as it is,
+  # without a new login.
   [string]$SessionDir  = "D:\dev\config\bricklink-session",
   # The Node scripts that drive the browser on this PC (scripts\session in this repository).
   [string]$ScriptsDir  = (Join-Path $PSScriptRoot "session"),
@@ -67,6 +70,9 @@ if ($DoImport) {
 }
 
 # --- 1-3: sign in on this PC and export the session -----------------------------
+# The Node scripts keep the browser profile, the reports and the export under this directory.
+# Without this they would use their own default and ignore -SessionDir.
+$env:BRICKLINK_SESSION_DIR = $SessionDir
 Push-Location $ScriptsDir
 try {
   if (-not (Test-Path "node_modules")) {
