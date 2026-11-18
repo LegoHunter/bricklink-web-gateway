@@ -1,0 +1,14 @@
+{
+  "name": "bricklink-web-gateway-session-scripts",
+  "private": true,
+  "type": "module",
+  "description": "PC-side scripts for the manual BrickLink (LEGO Account) sign-in whose session is imported into the gateway. See runbook.md section 5.",
+  "scripts": {
+    "login": "node login.mjs",
+    "check": "node check.mjs --http",
+    "export": "node export-state.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.56.1"
+  }
+}

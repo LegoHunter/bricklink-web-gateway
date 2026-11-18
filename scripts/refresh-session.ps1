@@ -36,7 +36,8 @@ param(
   [ValidateSet("sandbox", "dev", "prod")]
   [string]$Environment = "prod",
   [string]$SessionDir  = "D:\dev\config\bricklink-session",
-  [string]$SpikeDir    = "D:\dev\projects\lego-collection\bricklink-html\spike\homelab-79",
+  # The Node scripts that drive the browser on this PC (scripts\session in this repository).
+  [string]$ScriptsDir  = (Join-Path $PSScriptRoot "session"),
   # Override only to reach the gateway some other way (for example a local run).
   [string]$BaseUrl     = "",
   # Omit to stop after the sign-in and export.
@@ -66,8 +67,13 @@ if ($DoImport) {
 }
 
 # --- 1-3: sign in on this PC and export the session -----------------------------
-Push-Location $SpikeDir
+Push-Location $ScriptsDir
 try {
+  if (-not (Test-Path "node_modules")) {
+    Write-Host "`n[0/6] First run here: installing the one dependency of the scripts (npm install)..." -ForegroundColor Cyan
+    npm install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw "npm install failed in $ScriptsDir." }
+  }
   Write-Host "`n[1/6] Opening Chrome for manual sign-in. Enter your username, password, and the emailed code, then wait until you land on your BrickLink page." -ForegroundColor Cyan
   node login.mjs
 

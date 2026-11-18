@@ -54,9 +54,10 @@ login.
 
 ## 3. Before you start (prerequisites)
 
-- The **Windows PC** that holds the spike tooling, at
-  `D:\dev\projects\lego-collection\bricklink-html\spike\homelab-79`.
-- Node.js installed (the spike already runs there).
+- The **Windows PC**, with this repository checked out. The sign-in scripts are in
+  `scripts\session`, that is `D:\dev\projects\lego-collection\bricklink-web-gateway\scripts\session`.
+- Node.js and Chrome installed. Once, in that folder: `npm install` (`refresh-session.ps1` does
+  this itself on its first run).
 - Your **LEGO Account** sign-in credentials — you type them yourself, into LEGO's real page. They
   are never stored, pasted into chat, or put in any file for this procedure.
 - Access to the **sign-in code email**. LEGO emails a 6-digit code to the LEGO Account address,
@@ -104,7 +105,7 @@ alive) and resumes after a session import.
 To check the session held on the PC itself:
 
 ```sh
-cd D:\dev\projects\lego-collection\bricklink-html\spike\homelab-79
+cd D:\dev\projects\lego-collection\bricklink-web-gateway\scripts\session
 node check.mjs --http
 ```
 
@@ -130,10 +131,10 @@ the PC**, then **hand the session to the gateway**.
 
 ### 5.1 Sign in on the PC
 
-1. Open a terminal on the PC and go to the spike directory:
+1. Open a terminal on the PC and go to the session scripts:
 
    ```sh
-   cd D:\dev\projects\lego-collection\bricklink-html\spike\homelab-79
+   cd D:\dev\projects\lego-collection\bricklink-web-gateway\scripts\session
    ```
 
 2. Launch the headed login. A **real Chrome window** opens on BrickLink:
@@ -268,11 +269,21 @@ tested (tracked on HOMELAB-90):
 ## 9. How often should I expect to do this?
 
 Rarely. The keep-alive handles normal running, and the renewable layers slide forward with use. A
-full manual login is expected only at **bootstrap** and when the session **fully lapses**. The
-6-hourly lifetime check (HOMELAB-79) is measuring the real cadence; this runbook will be updated
-with the observed figure once it is known. The ~3-month LEGO Account layer (expiry around
-2027-02-14 at the time of writing) is the current best guess for a worst-case "must log in again"
-horizon if nothing else forces it sooner.
+full manual login is expected only at **bootstrap** and when the session **fully lapses**.
+
+What has been observed so far (a 6-hourly check of the session held on the PC, 2026-11-14 to
+2026-11-18, 24 checks, all signed in):
+
+- The two BrickLink layers expire 28 days after their last use, and every use moves that date
+  forward. With the hourly keep-alive they should not lapse.
+- The LEGO Account layer has a fixed expiry (2027-02-14 for the sign-in of 2026-11-14, about three
+  months) that use does **not** move. This is the expected worst-case "must log in again" date.
+- Whether the BrickLink layers can still be renewed after the LEGO Account layer expires has not
+  been observed yet. The first real answer comes around 2027-02-14.
+
+Each gateway reports the same figures for its own session as metrics:
+`bricklink.gateway.session.state`, `bricklink.gateway.session.signed.in.probe.age` and
+`bricklink.gateway.session.layer.expiry` (seconds until each layer expires).
 
 ---
 
