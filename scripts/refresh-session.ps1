@@ -35,8 +35,13 @@
 param(
   [ValidateSet("sandbox", "dev", "prod")]
   [string]$Environment = "prod",
+  # Holds the browser profile of one sign-in. Give each environment its own directory when each
+  # should have its own sign-in: a profile that is already signed in is exported as it is,
+  # without a new login.
   [string]$SessionDir  = "D:\dev\config\bricklink-session",
-  [string]$SpikeDir    = "D:\dev\projects\lego-collection\bricklink-html\spike\homelab-79",
+  # The Node scripts that drive the browser on this PC (scripts\session in this repository).
+  # Empty means the session folder next to this script.
+  [string]$ScriptsDir  = "",
   # Override only to reach the gateway some other way (for example a local run).
   [string]$BaseUrl     = "",
   # Omit to stop after the sign-in and export.
@@ -44,6 +49,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($ScriptsDir)) {
+  # Resolved here, not in the parameter default: Windows PowerShell leaves $PSScriptRoot empty there.
+  $ScriptsDir = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "session"
+}
+if (-not (Test-Path (Join-Path $ScriptsDir "login.mjs"))) {
+  throw "The sign-in scripts were not found in $ScriptsDir."
+}
 $state = Join-Path $SessionDir "portable-state.json"
 if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
   $BaseUrl = "https://bricklink-web-gateway.$Environment.internal.legohunter.io"
@@ -66,8 +78,16 @@ if ($DoImport) {
 }
 
 # --- 1-3: sign in on this PC and export the session -----------------------------
-Push-Location $SpikeDir
+# The Node scripts keep the browser profile, the reports and the export under this directory.
+# Without this they would use their own default and ignore -SessionDir.
+$env:BRICKLINK_SESSION_DIR = $SessionDir
+Push-Location $ScriptsDir
 try {
+  if (-not (Test-Path "node_modules")) {
+    Write-Host "`n[0/6] First run here: installing the one dependency of the scripts (npm install)..." -ForegroundColor Cyan
+    npm install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw "npm install failed in $ScriptsDir." }
+  }
   Write-Host "`n[1/6] Opening Chrome for manual sign-in. Enter your username, password, and the emailed code, then wait until you land on your BrickLink page." -ForegroundColor Cyan
   node login.mjs
 
