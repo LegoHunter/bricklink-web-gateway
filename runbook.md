@@ -242,9 +242,9 @@ coexisting over weeks has not been observed yet, so the check stays part of the 
 **One sign-in per environment.** `login.mjs` signs in only when its browser profile is signed out;
 a profile that is already signed in is exported as it is. To give an environment a sign-in of its
 own, give it its own profile folder:
-`scriptsefresh-session.ps1 -Environment dev -SessionDir D:\dev\configricklink-session-dev -DoImport`.
-As of 2026-11-18: SANDBOX runs on the sign-in held in `D:\dev\configricklink-session`, DEV on
-the one in `D:\dev\configricklink-session-dev`.
+`scripts\refresh-session.ps1 -Environment dev -SessionDir D:\dev\config\bricklink-session-dev -DoImport`.
+As of 2026-11-18: SANDBOX runs on the sign-in held in `D:\dev\config\bricklink-session`, DEV on
+the one in `D:\dev\config\bricklink-session-dev`.
 
 ---
 
