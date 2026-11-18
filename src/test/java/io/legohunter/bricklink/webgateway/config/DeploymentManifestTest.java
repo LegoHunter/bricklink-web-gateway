@@ -146,7 +146,10 @@ class DeploymentManifestTest {
         assertThat(profile.at("/lego/environment/production").asBoolean(false)).isEqualTo(env.equals("prod"));
         assertThat(profile.at("/spring/config/import/0").asText())
                 .isEqualTo("optional:file:${import-path}/bricklink-web-gateway.yml");
+        // The caller token has a file of its own, shared with the calling services; the admin token is not in it.
         assertThat(profile.at("/spring/config/import/1").asText())
+                .isEqualTo("optional:file:${import-path}/bricklink-web-gateway-caller.yml");
+        assertThat(profile.at("/spring/config/import/2").asText())
                 .isEqualTo("optional:file:${import-path}/bricklink-client-api-keys.yml");
 
         // The stockroom guard: A is reserved for PROD, B for DEV, C for SANDBOX.

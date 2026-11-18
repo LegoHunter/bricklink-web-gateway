@@ -280,23 +280,35 @@ horizon if nothing else forces it sooner.
 
 Needed once per environment (`sandbox`, `dev`, `prod`), before the first deploy there.
 
-1. **Tokens.** In Infisical, in that environment (not Global), create a secret named
-   `bricklink-web-gateway.yml` whose value is this YAML, with two different long random values of
-   your own:
+1. **Tokens.** In Infisical, in that environment (not Global), create two secrets, each with a
+   long random value of your own. They are two files so that a calling service can read the
+   caller token without also seeing the admin token.
+
+   `bricklink-web-gateway.yml` (read by the gateway only):
 
    ```yaml
    bricklink:
      web-gateway:
        admin-token: <long random value>
+   ```
+
+   `bricklink-web-gateway-caller.yml` (read by the gateway and by `lego-data-ingress`):
+
+   ```yaml
+   bricklink:
+     web-gateway:
        caller-token: <another long random value>
    ```
 
    - **admin-token** replaces the session (`/admin/session/import`). Only you use it.
-   - **caller-token** is for the services that use the gateway (`lego-data-ingress`, in a later
-     phase). It cannot replace the session.
+   - **caller-token** is for the services that use the gateway (`lego-data-ingress`). It cannot
+     replace the session.
+   - An environment set up before the second file existed may still have `caller-token` in
+     `bricklink-web-gateway.yml`. The gateway reads the caller file last, so that one wins; once it
+     is in place, remove `caller-token` from the first file.
 
-   The file reaches the pod under `/etc/.credentials`, like the other services' credential files,
-   and is read at startup: restart the pod after changing it. Without it the gateway still runs
+   The files reach the pod under `/etc/.credentials`, like the other services' credential files,
+   and are read at startup: restart the pod after changing it. Without it the gateway still runs
    and `GET /session` works, but every token-protected endpoint answers 503. Each environment has
    its own tokens; never copy one between environments.
 
