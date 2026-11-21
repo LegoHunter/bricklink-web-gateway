@@ -345,3 +345,48 @@ Needed once per environment (`sandbox`, `dev`, `prod`), before the first deploy 
    for the `tvattima+github` robot (once, not per environment).
 
 4. **First sign-in.** Deploy, then run Procedure B (section 5) against that environment.
+
+---
+
+## 11. Alerts
+
+Prometheus watches each environment's gateway through its session metrics. Alertmanager sends the
+alerts to the owner's phone through Pushover. The rules live in
+`lego-server-configuration/prometheus/prometheus-alerting-values.yaml`, documented in that folder's
+`README.md`. Each message names the namespace, so you know which environment's gateway it is.
+
+| Alert | Fires when | What to do |
+|---|---|---|
+| `BricklinkGatewaySignedOut` | `SIGNED_OUT` for 5 minutes | Section 5: sign in and import. It clears a few minutes after a successful import |
+| `BricklinkGatewaySessionUnknown` | `UNKNOWN` for 3 hours | Check `GET /session`: `lastProbeLocation` on `maintenance.bricklink.com` means BrickLink is in maintenance, so wait. **Do not sign in again.** Silence it in Alertmanager for a long, known outage |
+| `BricklinkGatewaySessionNotRenewing` | Signed in, but the two BrickLink cookies have not moved forward for over 3 days (less than 25 of their 28 days left) | Section 4: check the keep-alive in the log, force a probe |
+| `BricklinkGatewaySessionExpiringSoon` | Any session cookie expires within 7 days | Plan a section 5 sign-in before the date. For `LEGO_ACCOUNT` this is the expected one about three months after each sign-in |
+| `BricklinkGatewayMetricsDown` | Prometheus cannot read the gateway's metrics for 15 minutes | Check the pod, and that the NetworkPolicy still lets the `monitoring` namespace in on port 8080. None of the other alerts can fire until this is fixed |
+
+During a BrickLink outage the layer expiry dates stop moving, because only a successful probe
+renews them. An outage longer than about three weeks would therefore also raise
+`BricklinkGatewaySessionExpiringSoon`.
+
+### Testing the sign-out alert
+
+Do this in SANDBOX only, while BrickLink is up (during maintenance the probe gives `UNKNOWN`
+instead). It replaces the gateway's session with one that is not signed in, so lot writes fail until
+step 4.
+
+1. Make a state file holding one made-up BrickLink cookie, for example `D:\dev\config\signed-out-state.json`:
+   ```json
+   {"cookies": [{"name": "bricklink.lego-account.refresh-token", "value": "signed-out-test",
+                 "domain": ".bricklink.com", "path": "/"}]}
+   ```
+2. Import it with the bash script, which takes a state file path. On the PC, use Git Bash with
+   `BRICKLINK_GATEWAY_ADMIN_TOKEN` set to SANDBOX's admin token:
+   `./scripts/import-session.sh sandbox /d/dev/config/signed-out-state.json`. The script deletes
+   the file afterwards. Expect HTTP 422 with `"state":"SIGNED_OUT"`; the script then reports a
+   failure, which is expected here.
+3. Expect a Pushover message "The BrickLink web gateway is signed out" for `services-sandbox`
+   within about 7 minutes.
+4. Import the real session again:
+   `powershell -File scripts\refresh-session.ps1 -Environment sandbox -SessionDir D:\dev\config\bricklink-session -DoImport`.
+   The PC profile is still signed in, so no new login is needed. Expect `SIGNED_IN`, and
+   "Resolved: …" a few minutes later.
+5. Delete the export (section 5.4).
