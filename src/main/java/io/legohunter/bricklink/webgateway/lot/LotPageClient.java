@@ -37,6 +37,12 @@ public class LotPageClient {
 
     private static final String LIST_PATH = "/ajax/renovate/storeInventoryDetail/list.ajax";
     private static final String UPDATE_PATH = "/ajax/renovate/storeInventoryDetail/update.ajax";
+    /**
+     * The lot's inventory detail page. The older address ({@code /inventory_detail.asp}) answers with a
+     * redirect to this page over plain HTTP, which the pod's network policy (outbound 443 only) refuses,
+     * so the page is opened at its final HTTPS address.
+     */
+    private static final String DETAIL_PAGE_PATH = "/v2/inventory_detail.page";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final BrowserSession browser;
@@ -102,7 +108,7 @@ public class LotPageClient {
         pace();
         String body;
         try {
-            body = browser.submitPage(baseUrl + "/inventory_detail.asp?invID=" + lotId, "#InvStock" + lotId,
+            body = browser.submitPage(baseUrl + DETAIL_PAGE_PATH + "?invID=" + lotId, "#InvStock" + lotId,
                     List.of(action), "#submitUpdateButton", UPDATE_PATH);
         } catch (PageShapeException e) {
             if (e.getMessage().contains("no control")) {
