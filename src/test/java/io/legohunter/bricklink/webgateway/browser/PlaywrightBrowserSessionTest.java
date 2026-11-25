@@ -18,6 +18,19 @@ class PlaywrightBrowserSessionTest {
     }
 
     @Test
+    void failureTextOfAnErrorRaisedInTheBrowserShowsItsMessageNotTheWrapper() {
+        // The form Playwright gives such an error. SANDBOX showed only "PlaywrightException (Error {)" for a failed
+        // lot image delete, which says nothing about the cause.
+        RuntimeException failure = new RuntimeException(
+                "Error {\n  message='Clicking the checkbox did not change its state at https://x/y?invID=SECRET-ID\n"
+                        + "  name='Error\n  stack='Error: Clicking the checkbox did not change its state\n    at Frame.check\n}");
+
+        String text = PlaywrightBrowserSession.describe(failure);
+
+        assertThat(text).isEqualTo("RuntimeException (Clicking the checkbox did not change its state at https://x/y?<redacted>)");
+    }
+
+    @Test
     void browserCacheHasACeilingSoTheProfileVolumeStaysSmall() {
         assertThat(PlaywrightBrowserSession.LAUNCH_ARGS).contains("--disk-cache-size=52428800", "--disable-dev-shm-usage");
     }

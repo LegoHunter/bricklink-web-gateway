@@ -42,6 +42,7 @@ public class PlaywrightBrowserSession implements BrowserSession {
     private static final Logger log = LoggerFactory.getLogger(PlaywrightBrowserSession.class);
 
     /** The firewall answers 202 with a JavaScript challenge when its token cookie is missing or stale. */
+    private static final String DRIVER_ERROR_MESSAGE_PREFIX = "message='";
     private static final int FIREWALL_CHALLENGE = 202;
     private static final double CHALLENGE_SETTLE_TIMEOUT_MS = 15_000;
 
@@ -329,15 +330,33 @@ public class PlaywrightBrowserSession implements BrowserSession {
 
     /**
      * Playwright puts the requested URL in its messages, and sign-in redirects carry OAuth codes in the
-     * query string. Keep the first line only and cut every query string; the cause is not chained, so
-     * the raw message cannot reach a stack trace either.
+     * query string. Keep the first line of the error text only and cut every query string; the cause is
+     * not chained, so the raw message cannot reach a stack trace either.
      */
     static String describe(Throwable e) {
-        String message = e.getMessage() == null ? "" : e.getMessage().lines().findFirst().orElse("");
-        message = message.replaceAll("[?#]\\S*", "?<redacted>");
+        String message = firstLineOfErrorText(e.getMessage()).replaceAll("[?#]\\S*", "?<redacted>");
         if (message.length() > 200) {
             message = message.substring(0, 200) + "...";
         }
         return e.getClass().getSimpleName() + (message.isBlank() ? "" : " (" + message + ")");
+    }
+
+    /**
+     * An error raised inside the browser arrives as {@code "Error {\n  message='<text>\n  name='<name>\n  stack='..."}:
+     * its first line says nothing, and the text is on the second.
+     */
+    private static String firstLineOfErrorText(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        List<String> lines = raw.lines().map(String::strip).toList();
+        if (lines.isEmpty()) {
+            return "";
+        }
+        if (lines.size() > 1 && lines.get(0).equals("Error {")) {
+            String text = lines.get(1);
+            return text.startsWith(DRIVER_ERROR_MESSAGE_PREFIX) ? text.substring(DRIVER_ERROR_MESSAGE_PREFIX.length()) : text;
+        }
+        return lines.get(0);
     }
 }
