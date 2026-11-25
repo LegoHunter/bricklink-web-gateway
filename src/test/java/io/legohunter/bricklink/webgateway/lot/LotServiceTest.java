@@ -113,7 +113,7 @@ class LotServiceTest {
 
         assertThat(lot.customImage()).isTrue();
         assertThat(browser.lots.get(OWN).uploaded).isEqualTo(replacement);
-        assertThat(browser.calls.get(1)).startsWith("submitPage /inventory_detail.asp").contains("#delImg");
+        assertThat(browser.calls.get(1)).startsWith("submitPage /v2/inventory_detail.page").contains("#delImg");
         assertThat(browser.calls).contains("postFile /imgAdd.asp FILE");
     }
 
