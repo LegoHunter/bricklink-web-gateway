@@ -196,6 +196,15 @@ first); the bash script reads that variable or a protected token file. Neither t
 a command-line argument, because shells save command lines in plain-text history. Both then POST
 the state file and confirm with `GET /session`.
 
+The token is the `admin-token` value in the Infisical secret `bricklink-web-gateway.yml` of the
+environment you are importing into (section 10). For the bash script, set it without it reaching
+the shell history, as two separate commands: `read -s BRICKLINK_GATEWAY_ADMIN_TOKEN` (paste, then
+Enter), then `export BRICKLINK_GATEWAY_ADMIN_TOKEN`.
+
+Both scripts delete the state file once it has been sent, whether the import succeeded or not.
+The bash script keeps it when it stops before sending anything (wrong environment name, no admin
+token) and says so.
+
 Answers from the import call:
 
 | HTTP | Meaning |
@@ -378,11 +387,21 @@ step 4.
    {"cookies": [{"name": "bricklink.lego-account.refresh-token", "value": "signed-out-test",
                  "domain": ".bricklink.com", "path": "/"}]}
    ```
-2. Import it with the bash script, which takes a state file path. On the PC, use Git Bash with
-   `BRICKLINK_GATEWAY_ADMIN_TOKEN` set to SANDBOX's admin token:
-   `./scripts/import-session.sh sandbox /d/dev/config/signed-out-state.json`. The script deletes
-   the file afterwards. Expect HTTP 422 with `"state":"SIGNED_OUT"`; the script then reports a
-   failure, which is expected here.
+2. Import it with the bash script, which takes a state file path. On the PC, use Git Bash or WSL,
+   from the `bricklink-web-gateway` folder. The admin token is the `admin-token` value in
+   Infisical's Sandbox secret `bricklink-web-gateway.yml` (not `bricklink-web-gateway-caller.yml`).
+   Run these as three separate commands; pasting them together makes `read` take the next line
+   as the token:
+   ```sh
+   read -s BRICKLINK_GATEWAY_ADMIN_TOKEN     # paste the token at the empty prompt, press Enter
+   export BRICKLINK_GATEWAY_ADMIN_TOKEN
+   ./scripts/import-session.sh sandbox /d/dev/config/signed-out-state.json       # Git Bash
+   ./scripts/import-session.sh sandbox /mnt/d/dev/config/signed-out-state.json   # WSL
+   ```
+   Run only the last line that fits your shell. Expect HTTP 422 with `"state":"SIGNED_OUT"`; the
+   script then reports that the import did not complete, which is expected here, and deletes the
+   file. If it stops earlier (for example with no admin token), it sends nothing and keeps the
+   file, so you can run it again.
 3. Expect a Pushover message "The BrickLink web gateway is signed out" for `services-sandbox`
    within about 7 minutes.
 4. Import the real session again:
